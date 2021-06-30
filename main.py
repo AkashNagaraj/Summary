@@ -1,55 +1,60 @@
 import torch
 import torch.nn as nn
 
-import json
-import math
-import itertools
+from preprocess import *
 
 
-def split_data(data):
-    train_data = []
-    for i,val in enumerate(data):
-        train_data.append((data[i],  data[:i] + data[i+1:]))
+def get_vocab():
+    word_idx_dir = "../data/pubmed-dataset/vocab"
+    file = [val.split() for val in open(word_idx_dir, 'r').read().splitlines()]
+    word_to_idx, idx_to_word = {}, {}
+    for line in file:
+        word_to_idx[line[0]]=int(line[1])
+        idx_to_word[int(line[1])]=line[0]
+    return word_to_idx, idx_to_word
+
+
+def convert_vector(data, size):
+    data = " ".join([val for val in data]).split()
+    if len(data)>size:
+        data = data[:size]
+    else:
+        data += ["unknown"] * (size-len(data))
+
+    word_to_idx, _ = get_vocab()
+    new_data = []
+    for val in data:
+        if val in word_to_idx:
+            new_data.append(word_to_idx[val])
+        else:
+            new_data.append(word_to_idx['unknown'])
+        
+    #new_data = [word_to_idx[val] if val in word_to_idx else word_to_idx['unknown'] for val in data]
+    return new_data
+
+
+def train(data, size, device):
+   
+    # Transformer 1 - input:article_text, output:sections
     
-
-
-def prepare_data(lines):
-    seq_len = 10
-    for line in lines:
-        line = line + ['unknown'] * (math.ceil(len(line)/seq_len)*seq_len - len(line))
-        data = [line[idx:idx+seq_len] for idx in range(0,len(line),seq_len)]
-        split_data(data) 
-
-
-def convert_to_tensor(data):
-    #dict_keys(['article_id', 'article_text', 'abstract_text', 'labels', 'section_names', 'sections'])
-
-    article_sent = [' '.join([sent for sent in line['article_text']]).split() for line in data]
-    abstract_sent = [' '.join([sent for sent in line['abstract_text']]).split() for line in data]
-    prepare_data(article_sent)
-
-
-def read_data():
-    data_dir = "../data/pubmed-dataset/"
+    article_input, inp_size = data['article_text'], 90*size  
+    section_output, out_size = data['sections'], 500
     
-    current = "val.txt" # Change later to train
-    read_lines = open(data_dir+current,'r').readlines()
-    read_lines = [json.loads(val) for val in read_lines] 
-    
-    test = 3
-    return read_lines[:test] # Using only first 10 for now
+    for i in range(size):
+        for idx,sequence in enumerate(article_input[i]):
+            input = convert_vector(sequence, inp_size)
+            output = convert_vector(section_output[i], out_size)
+            input = torch.tensor(input, dtype=torch.long).to(device)
+            output = torch.tensor(output, dtype=torch.long).to(device)
 
 
 def main():
-    data = read_data()
-    convert_to_tensor(data)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    data, size = read_data(test=True) # dict_keys(['article_id', 'article_text', 'abstract_text', 'labels', 'section_names', 'sections']
+    train(data, size, device)
     """
-    train()
-    transfomers(data) # Use one sent to generate all others...
-    lstm_fb() # Concatenate hidden layers[f,b] of sentence embedding and add it to decoder
-    word_cnn() # Multiple for single sent and concatenate and add to decoder
-    token_emb() # Add grammar/syntax/topic/style... something
-    eval()
+    Transformer 1 : inp = article, out1 = sent
+    Transformer 2 : inp = out1*sent, out2 = abstract
     """
 
 

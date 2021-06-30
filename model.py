@@ -216,22 +216,26 @@ class Transformer(nn.Module):
         src_mask = self.make_src_mask(src)
         trg_mask = self.make_trg_mask(trg)
         enc_src = self.encoder(src, src_mask)
+        print("Encoder completed")
         out = self.decoder(trg, enc_src, src_mask, trg_mask)
         return out
 
 if __name__ == "__main__":
     #device = torch.device("cuda" if torch.cuda.is_available else "cpu") 
     device = torch.device("cpu")
-    x = torch.tensor([[1,2,3,4,5,6,7,8,9], [1,2,3,4,5,6,7,8,9]]).to(device)
-    trg = torch.tensor([[1,2,3,4,5,6,78], [3,2,3,4,5,6,78]]).to(device)
+    x = torch.tensor([[1,2,3,4,5,6,7,8,9,10], [1,2,3,4,5,6,7,8,9,10], [1,2,3,4,5,6,7,8,9,10]]).to(device)
+    #trg = torch.tensor([[1,2,3,4,5,6,7,8,34,5,6,6], [3,2,3,4,5,6,7,8,6,3,4,5]]).to(device)
+    trg = torch.ones(5,50,dtype=torch.long).to(device)
 
     src_pad_idx = 0
     trg_pad_idx =0
-    src_vocab_size = 10
-    trg_vocab_size = 10
+    src_vocab_size = 50
+    trg_vocab_size = 50
     model = Transformer(src_vocab_size, trg_vocab_size, src_pad_idx, trg_pad_idx).to(device)
-    out = model(x, trg[:,:-2])
-    print("Target : {}".format(trg[:,:-2]))
+    trg = trg[:,:]
+    out = model(x, trg)
+    soft = nn.Softmax(dim=1)
+    out = soft(out)
     print(out.shape)
 
 
