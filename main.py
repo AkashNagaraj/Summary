@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from preprocess import *
-
+from transformer_model import *
 
 def get_vocab():
     word_idx_dir = "../data/pubmed-dataset/vocab"
@@ -33,20 +33,55 @@ def convert_vector(data, size):
     return new_data
 
 
-def train(data, size, device):
+def get_batch(input, target, num_lines):
+    input_size, target_size = 200, 500
    
-    # Transformer 1 - input:article_text, output:sections
-    
-    article_input, inp_size = data['article_text'], 90*size  
-    section_output, out_size = data['sections'], 500
-    
-    for i in range(size):
-        for idx,sequence in enumerate(article_input[i]):
-            input = convert_vector(sequence, inp_size)
-            output = convert_vector(section_output[i], out_size)
-            input = torch.tensor(input, dtype=torch.long).to(device)
-            output = torch.tensor(output, dtype=torch.long).to(device)
+    min_seq_len = min([len(input[i]) for i in range(0, num_lines)])
+    #print(min_seq_len)
 
+    for i in range(0, num_lines):
+        for seq in input[i]:
+            new_input = (convert_vector(seq, input_size))
+            new_input = torch.tensor(new_input, dtype=torch.long)    
+        
+        new_target = convert_vector(target[i], target_size)
+        new_target = torch.tensor(new_target, dtype=torch.long)
+        print(new_input.shape)
+        print(new_target.shape)
+
+
+def train(data, num_lines, device):
+    
+    # Hyperparameters 
+    src_pad_idx = 0
+    trg_pad_idx = 0
+    word_to_idx, idx_to_word = get_vocab()
+    src_vocab_size = max(idx_to_word.keys())
+    trg_vocab_size = max(idx_to_word.keys())
+    print(src_vocab_size)
+    input_size, target_size = 200, 500
+    epochs = 1
+
+    # Transformer 1
+    model1 = Transformer(src_vocab_size, trg_vocab_size, src_pad_idx, trg_pad_idx).to(device)  
+    input_ = data['article_text']
+    target = data['sections']
+
+    #get_batch(input_, target_, num_lines)
+
+    for i in range(epochs):
+        for i in range(0, num_lines):
+            for seq in input_[i]:
+                new_input = (convert_vector(seq, input_size))
+            new_target = (convert_vector(target[i], target_size))
+            #print(new_target)
+        """
+                new_input = torch.tensor((convert_vector(seq, input_size))).reshape(10,-1).to(device)
+                new_target = torch.tensor(convert_vector(target[i], target_size)).reshape(10,-1).to(device)
+                print(new_input.shape, new_target.shape)
+                out = model1(new_input, new_target)
+                print(out.shape)
+        """
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

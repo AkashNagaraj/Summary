@@ -51,6 +51,7 @@ class TransformerBlock(nn.Module):
         self.norm1 = nn.LayerNorm(embed_size)
         self.norm2 = nn.LayerNorm(embed_size)
 
+        # Usually error in this part
         self.feed_forward = nn.Sequential(
                 nn.Linear(embed_size, forward_expansion*embed_size),
                 nn.ReLU(),
@@ -60,7 +61,6 @@ class TransformerBlock(nn.Module):
 
     def forward(self, value, key, query, mask):
         attention = self.attention(value, key, query, mask)
-        
         x = self.dropout(self.norm1(attention + query)) # Skip connection 
         forward = self.feed_forward(x)
         out = self.dropout(self.norm2(forward + x)) # Skip connection
@@ -98,12 +98,10 @@ class Encoder(nn.Module):
     def forward(self, x, mask):
             N, seq_length = x.shape
             positions = torch.arange(0, seq_length).expand(N,seq_length).to(self.device)
-            
             out = self.dropout(self.word_embedding(x) + self.position_embedding(positions))
-
+            #print("Encoder - positions: {}, out: {}".format(positions.shape, out.shape))
             for layer in self.layers:
                 out = layer(out, out, out, mask)
-            
             return out
 
 
@@ -120,6 +118,7 @@ class DecoderBlock(nn.Module):
     def forward(self, x, value, key, src_mask, trg_mask):
         attention = self.attention(x,x,x,trg_mask)
         query = self.dropout(self.norm(attention + x))
+        print("Decoder - Value : {}, Key : {}, Query : {}, Src_mask : {}".format(value.shape, key.shape, query.shape, src_mask.shape))
         out = self.transformer_block(value, key, query, src_mask)
         return out
 
@@ -216,19 +215,20 @@ class Transformer(nn.Module):
         src_mask = self.make_src_mask(src)
         trg_mask = self.make_trg_mask(trg)
         enc_src = self.encoder(src, src_mask)
-        print("Encoder completed")
+        print("Encoder - trg : {}, enc_src : {}, src_mask : {}, trg_mask : {}".format(trg.shape, enc_src.shape, src_mask.shape, trg_mask.shape))
         out = self.decoder(trg, enc_src, src_mask, trg_mask)
         return out
 
 if __name__ == "__main__":
     #device = torch.device("cuda" if torch.cuda.is_available else "cpu") 
     device = torch.device("cpu")
-    x = torch.tensor([[1,2,3,4,5,6,7,8,9,10], [1,2,3,4,5,6,7,8,9,10], [1,2,3,4,5,6,7,8,9,10]]).to(device)
+    #x = torch.tensor([[1,2,3,4,5,6,7,8,9,10], [1,2,3,4,5,6,7,8,9,10], [1,2,3,4,5,6,7,8,9,10]]).to(device)
     #trg = torch.tensor([[1,2,3,4,5,6,7,8,34,5,6,6], [3,2,3,4,5,6,7,8,6,3,4,5]]).to(device)
-    trg = torch.ones(5,50,dtype=torch.long).to(device)
+    x = torch.ones(10,20,dtype=torch.long).to(device)
+    trg = torch.ones(10,50,dtype=torch.long).to(device)
 
     src_pad_idx = 0
-    trg_pad_idx =0
+    trg_pad_idx = 0
     src_vocab_size = 50
     trg_vocab_size = 50
     model = Transformer(src_vocab_size, trg_vocab_size, src_pad_idx, trg_pad_idx).to(device)
