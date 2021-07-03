@@ -52,12 +52,12 @@ def preprocess_data(data):
 
 
 def read_data(test):
-    data_dir = "../data/pubmed-dataset/"
+    data_dir = "data/pubmed-dataset/"
     current = "val.txt" # Change later to train
     read_lines = open(data_dir+current,'r').readlines()
     data = [json.loads(val) for val in read_lines] 
     if test:
-        test = 3 # Use only small data_size
+        test = 10 # Use only small data_size
         data = data[:test]
     train_data = preprocess_data(data)
     return train_data, len(data)

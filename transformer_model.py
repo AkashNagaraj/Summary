@@ -118,7 +118,7 @@ class DecoderBlock(nn.Module):
     def forward(self, x, value, key, src_mask, trg_mask):
         attention = self.attention(x,x,x,trg_mask)
         query = self.dropout(self.norm(attention + x))
-        print("Decoder - Value : {}, Key : {}, Query : {}, Src_mask : {}".format(value.shape, key.shape, query.shape, src_mask.shape))
+        #print("Decoder - Value : {}, Key : {}, Query : {}, Src_mask : {}".format(value.shape, key.shape, query.shape, src_mask.shape))
         out = self.transformer_block(value, key, query, src_mask)
         return out
 
@@ -163,13 +163,13 @@ class Transformer(nn.Module):
                 src_vocab_size, 
                 trg_vocab_size, 
                 src_pad_idx, 
-                trg_pad_idx, 
+                trg_pad_idx,
+                device,
                 embed_size=256, 
                 num_layers=6, 
                 forward_expansion=4, 
                 heads=8, 
                 dropout=0, 
-                device="cpu", 
                 max_length=100):
         
         super(Transformer, self).__init__()
@@ -215,13 +215,13 @@ class Transformer(nn.Module):
         src_mask = self.make_src_mask(src)
         trg_mask = self.make_trg_mask(trg)
         enc_src = self.encoder(src, src_mask)
-        print("Encoder - trg : {}, enc_src : {}, src_mask : {}, trg_mask : {}".format(trg.shape, enc_src.shape, src_mask.shape, trg_mask.shape))
+        #print("Encoder - trg : {}, enc_src : {}, src_mask : {}, trg_mask : {}".format(trg.shape, enc_src.shape, src_mask.shape, trg_mask.shape))
         out = self.decoder(trg, enc_src, src_mask, trg_mask)
         return out
 
 if __name__ == "__main__":
-    #device = torch.device("cuda" if torch.cuda.is_available else "cpu") 
-    device = torch.device("cpu")
+    device = torch.device("cuda:2" if torch.cuda.is_available else "cpu") 
+    #device = torch.device("cpu")
     #x = torch.tensor([[1,2,3,4,5,6,7,8,9,10], [1,2,3,4,5,6,7,8,9,10], [1,2,3,4,5,6,7,8,9,10]]).to(device)
     #trg = torch.tensor([[1,2,3,4,5,6,7,8,34,5,6,6], [3,2,3,4,5,6,7,8,6,3,4,5]]).to(device)
     x = torch.ones(10,20,dtype=torch.long).to(device)
@@ -229,9 +229,18 @@ if __name__ == "__main__":
 
     src_pad_idx = 0
     trg_pad_idx = 0
-    src_vocab_size = 50
-    trg_vocab_size = 50
-    model = Transformer(src_vocab_size, trg_vocab_size, src_pad_idx, trg_pad_idx).to(device)
+    src_vocab_size = 50000
+    trg_vocab_size = 50000
+    """
+    embed_size=256,
+    num_layers=6,
+    forward_expansion=4,
+    heads=8,
+    dropout=0,
+    device,
+    max_length=100
+    """
+    model = Transformer(src_vocab_size, trg_vocab_size, src_pad_idx, trg_pad_idx, device).to(device)
     trg = trg[:,:]
     out = model(x, trg)
     soft = nn.Softmax(dim=1)
