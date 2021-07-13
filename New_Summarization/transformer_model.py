@@ -220,12 +220,12 @@ class Transformer(nn.Module):
         return out
 
 if __name__ == "__main__":
-    #device = torch.device("cuda:2" if torch.cuda.is_available else "cpu") 
+    #device = torch.device("cuda" if torch.cuda.is_available else "cpu") 
     device = torch.device("cpu")
     input_sent = 10
     output_sent = 10
-    x = torch.ones(2,10,input_sent,dtype=torch.long).to(device)
-    trg = torch.ones(2,10,output_sent,dtype=torch.long).to(device)
+    x = torch.ones(10,input_sent,dtype=torch.long).to(device)
+    trg = torch.ones(10,output_sent,dtype=torch.long).to(device)
 
     src_pad_idx = 0
     trg_pad_idx = 0
