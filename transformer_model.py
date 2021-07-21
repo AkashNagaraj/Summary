@@ -220,32 +220,25 @@ class Transformer(nn.Module):
         return out
 
 if __name__ == "__main__":
-    device = torch.device("cuda:2" if torch.cuda.is_available else "cpu") 
+    device = torch.device("cuda:1" if torch.cuda.is_available else "cpu") 
     #device = torch.device("cpu")
-    #x = torch.tensor([[1,2,3,4,5,6,7,8,9,10], [1,2,3,4,5,6,7,8,9,10], [1,2,3,4,5,6,7,8,9,10]]).to(device)
-    #trg = torch.tensor([[1,2,3,4,5,6,7,8,34,5,6,6], [3,2,3,4,5,6,7,8,6,3,4,5]]).to(device)
-    x = torch.ones(10,20,dtype=torch.long).to(device)
-    trg = torch.ones(10,50,dtype=torch.long).to(device)
+    input_sent = 10
+    output_sent = 10
+    x = torch.ones(20,input_sent,dtype=torch.long).to(device)
+    trg = torch.ones(20,output_sent,dtype=torch.long).to(device)
 
     src_pad_idx = 0
     trg_pad_idx = 0
-    src_vocab_size = 50000
-    trg_vocab_size = 50000
-    """
-    embed_size=256,
-    num_layers=6,
-    forward_expansion=4,
-    heads=8,
-    dropout=0,
-    device,
-    max_length=100
-    """
+    src_vocab_size = 50
+    trg_vocab_size = 50
+    
     model = Transformer(src_vocab_size, trg_vocab_size, src_pad_idx, trg_pad_idx, device).to(device)
-    trg = trg[:,:]
+    
     out = model(x, trg)
     soft = nn.Softmax(dim=1)
     out = soft(out)
-    print(out.shape)
+    out = torch.argmax(out,dim=2)
+    print(out.shape)#torch.argmax(out[1], dim=1))
 
 
 

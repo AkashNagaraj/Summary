@@ -1,63 +1,77 @@
 import json
+import re
 import math
 import itertools
 
 
-def get_data(data, key):
-    return [line[key] for line in data]
+def preprocess_data(sentence, max_len):
+    words = sentence.split()
+    if len(words)>max_len:
+        sentence = ' '.join(words[:max_len])
+    else:
+        add = ' unknown ' * (max_len-len(words))
+        sentence += add # Find out what to add
+
+    # Check len of sent print(len(sentence.split()))
+    return sentence.split()
 
 
-def get_stats(article, sections):
-    avg_word_count = sum([len(sent.split()) for line in sections for list_ in line for sent in list_]) / sum([len(line) for line in sections for list_ in line])
-    return avg_word_count
+def make_input(data, labels, max_len):
+    input_data, min_len= [], 6
+    for idx, list_ in enumerate(data):
+        for sent in list_:
+            data = (preprocess_data(sent, max_len),labels[idx].split())
+            input_data.append(data)  # Currently len is fixed try variable
+    return input_data
 
 
-def split_article(data, split):
-    new_data = []
-    for line in data:
-        line_ = [line[idx:idx+split] for idx in range(0, len(line), split)]
-        new_data.append(line_)
-    return new_data
-
-
-def preprocess_data(data):
+def build_train(file_data, sent_len):
     
     """
     {
     'article_text':[[S1,S2,..],[S1,S2..],...,[S1,S2..]]
     'abstract_text':[[S1],[S1],...,[S1]]
-    'section_names': [[S1,S2..],[S1,S2,..],...,[S1,S2,..]]
+    'section_names': [[S1,S2..],[S1,S2,..],...,[S1,S2,..]] ## labels
     'sections': [ [[S1,S2,..],[],..,[]], [[S1,S2,..],[],..,[]], ..., [[S1,S2,..],[],..,[]]] 
-    'labels': 
     'article_id':
     }
     """
+    
+    train_data = []
+    decoder_len = 300
+    line_labels = []
 
-    article_text = get_data(data, 'article_text')
-    abstract_text = get_data(data, 'abstract_text')
-    section_names = get_data(data, 'section_names')
+    for line in file_data:
+        #content = line['article_text']
+        section_data = line['sections']
+        section_labels = line['section_names']
+        line_labels.append(section_labels)
+        encoder_data = make_input(section_data, section_labels, sent_len)         
+        decoder_data = ' '.join([sent for sent in line['abstract_text']]).split() 
 
-    temp_sections, sections = get_data(data, 'sections'), []
-    for line in temp_sections:
-        temp_sent = [sent for list_ in line for sent in list_]
-        sections.append(temp_sent)
-  
-    word_count = get_stats(article_text, sections)
-    train = {'article_text':[], 'abstract_text':[], 'section_names':[], 'sections':[]}
-    train['article_text'] = split_article(article_text, split=10) 
-    train['abstract_text'] = abstract_text
-    train['sections'] = sections # Has detailed info
-    train['section_names'] = section_names
-    return train
+        # Use this for decoder of same length - preprocess_data(' '.join([sent for sent in line['abstract_text']]),decoder_len)
+        train_data.append((encoder_data, decoder_data))
+
+    total_labels = list(set([word.lower() if re.search(r'\d+',word)==None else 'number' for lines in line_labels for labels in lines for word in labels.split()]))
+    
+    label_dir = 'data/pubmed-dataset/labels'
+    file_ = open(label_dir,'w')
+    for val in total_labels:
+        file_.write(val+"\n")
+
+    return train_data
 
 
-def read_data(test):
+def read_data(max_sent_len, test):
     data_dir = "data/pubmed-dataset/"
     current = "val.txt" # Change later to train
     read_lines = open(data_dir+current,'r').readlines()
     data = [json.loads(val) for val in read_lines] 
+    
     if test:
-        test = 10 # Use only small data_size
-        data = data[:test]
-    train_data = preprocess_data(data)
-    return train_data, len(data)
+        train_data = build_train(data[:10], max_sent_len)
+    else:
+        train_data = build_train(data, max_sent_len)
+
+    return train_data
+    
