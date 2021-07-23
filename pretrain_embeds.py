@@ -94,4 +94,8 @@ def train_sent_label_embeds(train_data, sent_len, epochs):
         total_loss += current_loss.item()
       losses.append(total_loss)
     print(losses)
-
+    
+    """
+    Input Batch [Use sent+label N times to predict output..]
+    Ouput - Abstract embeds [vocab size same as sent]
+    """

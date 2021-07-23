@@ -32,7 +32,7 @@ def build_train(file_data, sent_len):
     'article_text':[[S1,S2,..],[S1,S2..],...,[S1,S2..]]
     'abstract_text':[[S1],[S1],...,[S1]]
     'section_names': [[S1,S2..],[S1,S2,..],...,[S1,S2,..]] ## labels
-    'sections': [ [[S1,S2,..],[],..,[]], [[S1,S2,..],[],..,[]], ..., [[S1,S2,..],[],..,[]]] 
+    'sections': [[[S1,S2,..],[],..,[]], [[S1,S2,..],[],..,[]], ..., [[S1,S2,..],[],..,[]]] 
     'article_id':
     }
     """

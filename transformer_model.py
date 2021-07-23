@@ -214,9 +214,9 @@ class Transformer(nn.Module):
     def forward(self, src, trg):
         src_mask = self.make_src_mask(src)
         trg_mask = self.make_trg_mask(trg)
-        enc_src = self.encoder(src, src_mask)
+        enc_src = self.encoder(src, src_mask).to(self.device) # changed
         #print("Encoder - trg : {}, enc_src : {}, src_mask : {}, trg_mask : {}".format(trg.shape, enc_src.shape, src_mask.shape, trg_mask.shape))
-        out = self.decoder(trg, enc_src, src_mask, trg_mask)
+        out = self.decoder(trg, enc_src, src_mask, trg_mask).to(self.device)
         return out
 
 if __name__ == "__main__":
