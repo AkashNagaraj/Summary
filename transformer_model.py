@@ -214,13 +214,13 @@ class Transformer(nn.Module):
     def forward(self, src, trg):
         src_mask = self.make_src_mask(src)
         trg_mask = self.make_trg_mask(trg)
-        enc_src = self.encoder(src, src_mask).to(self.device) # changed
+        enc_src = self.encoder(src, src_mask)
         #print("Encoder - trg : {}, enc_src : {}, src_mask : {}, trg_mask : {}".format(trg.shape, enc_src.shape, src_mask.shape, trg_mask.shape))
-        out = self.decoder(trg, enc_src, src_mask, trg_mask).to(self.device)
+        out = self.decoder(trg, enc_src, src_mask, trg_mask)
         return out
 
 if __name__ == "__main__":
-    device = torch.device("cuda:1" if torch.cuda.is_available else "cpu") 
+    device = torch.device("cuda:0" if torch.cuda.is_available else "cpu") 
     #device = torch.device("cpu")
     input_sent = 10
     output_sent = 10

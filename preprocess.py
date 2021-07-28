@@ -25,14 +25,14 @@ def make_input(data, labels, max_len):
     return input_data
 
 
-def build_train(file_data, sent_len):
+def build_data(file_data, sent_len, type_):
     
     """
     {
     'article_text':[[S1,S2,..],[S1,S2..],...,[S1,S2..]]
     'abstract_text':[[S1],[S1],...,[S1]]
     'section_names': [[S1,S2..],[S1,S2,..],...,[S1,S2,..]] ## labels
-    'sections': [[[S1,S2,..],[],..,[]], [[S1,S2,..],[],..,[]], ..., [[S1,S2,..],[],..,[]]] 
+    'sections': [ [[S1,S2,..],[],..,[]], [[S1,S2,..],[],..,[]], ..., [[S1,S2,..],[],..,[]]] 
     'article_id':
     }
     """
@@ -47,31 +47,43 @@ def build_train(file_data, sent_len):
         section_labels = line['section_names']
         line_labels.append(section_labels)
         encoder_data = make_input(section_data, section_labels, sent_len)         
-        decoder_data = ' '.join([sent for sent in line['abstract_text']]).split() 
+        decoder_data = ' '.join(line['abstract_text']).split() 
 
-        # Use this for decoder of same length - preprocess_data(' '.join([sent for sent in line['abstract_text']]),decoder_len)
+        # Use this for decoder of same length - preprocess_data(' '.join(line['abstract_text']),decoder_len)
         train_data.append((encoder_data, decoder_data))
 
-    total_labels = list(set([word.lower() if re.search(r'\d+',word)==None else 'number' for lines in line_labels for labels in lines for word in labels.split()]))
+    total_labels = list(set([re.sub(r'[^\w\s]','',word.lower()) if re.search(r'\d+',word)==None else 'number' for lines in line_labels for labels in lines for word in labels.split()]))
     
-    label_dir = 'data/pubmed-dataset/labels'
-    file_ = open(label_dir,'w')
-    for val in total_labels:
-        file_.write(val+"\n")
+    if type_=='train':
+        label_dir = 'data/pubmed-dataset/labels'
+        file_ = open(label_dir,'w')
+        for val in total_labels:
+            file_.write(val+"\n")
 
     return train_data
 
 
-def read_data(max_sent_len, test):
+def read_data(max_sent_len, test_runtime):
     data_dir = "data/pubmed-dataset/"
-    current = "val.txt" # Change later to train
+    current = "train.txt"
     read_lines = open(data_dir+current,'r').readlines()
-    data = [json.loads(val) for val in read_lines] 
-    
-    if test:
-        train_data = build_train(data[:10], max_sent_len)
-    else:
-        train_data = build_train(data, max_sent_len)
+    train_data = [json.loads(val) for val in read_lines]
 
-    return train_data
-    
+    current = "test.txt"
+    read_lines = open(data_dir+current,'r').readlines()
+    test_data = [json.loads(val) for val in read_lines]
+
+    current = "val.txt"
+    read_lines = open(data_dir+current,'r').readlines()
+    val_data = [json.loads(val) for val in read_lines]
+
+    if test_runtime:
+        train_data = train_data[:10]
+        test_data = test_data[:10]
+        val_data = val_data[:10]
+
+    train_data = build_data(train_data, max_sent_len, 'train')
+    test_data = build_data(test_data, max_sent_len, 'test')
+    val_data = build_data(val_data, max_sent_len, 'val')
+
+    return train_data, test_data, val_data 
