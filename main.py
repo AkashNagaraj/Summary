@@ -1,8 +1,10 @@
 from preprocess import *
 from transformer_model import *
 from build_embeds import *
+from cnn import *
 
 import re
+
 
 def convert_to_vec(sent, label):
     
@@ -14,7 +16,6 @@ def convert_to_vec(sent, label):
 
     new_label = [re.sub(r'[^\w\s]','',word.lower()) if re.search(r'\d+',word.lower())==None else 'number' for word in label.strip().split()]
     label_vec = [label_to_idx[label] for label in new_label]
-
     return sent_vec, label_vec
 
 
@@ -66,41 +67,47 @@ def combine_embeds(type_):
     input_pad, output_pad = 0, 0
     loss_func = nn.CrossEntropyLoss()
     
+    cnn_model = CNN().to(device)
+
     sent_model = Transformer(len(word_to_idx), len(word_to_idx), input_pad, output_pad, device).to(device)
     sent_weights = torch.load(weights_dir + 'sentence_model.pth')
     sent_embeddings = sent_weights['encoder.word_embedding.weight']
-    #sent_model.load_state_dict(sent_weights)
     
     label_model = Transformer(len(label_to_idx), len(label_to_idx), input_pad, output_pad, device).to(device)
     label_weights = torch.load(weights_dir+'label_model.pth')
     label_embeddings = label_weights['encoder.word_embedding.weight']
     
+    input_embed_len = label_embeddings.shape[1] + sent_embeddings.shape[1] 
     current_file = type_+'.txt'
     read_lines = open(data_dir+current_file,'r').readlines()
     
+    #print(label_embeddings.shape, sent_embeddings.shape)
+
     for input_, output in transformer_data(read_lines):
         sent, label = input_[0], input_[1]
+        transformer_input = torch.empty(size=(len(sent), input_embed_len)).to(device)
         for idx, val in enumerate(sent):
             if len(val)!=0:
                 s = torch.tensor(val, dtype = torch.long).to(device)
-                l = torch.tensor(label[idx], dtype = torch.long) .to(device)
+                l = torch.tensor(label[idx], dtype = torch.long).to(device)
            
                 # Combine word embeds for sentence
                 s_embeds = sent_embeddings[s]
                 s_row = torch.tensor(s_embeds.shape[0])
-                s_embeds = torch.prod(s_embeds,dim=0)/torch.sqrt(s_row)
-                s_embeds.to(device)
-
+                s_embeds = torch.prod(s_embeds,dim=0).reshape(1,-1)/torch.sqrt(s_row)
+    
                 # Combine words embeds for labels
                 l_embeds = label_embeddings[l]
                 l_row = torch.tensor(l_embeds.shape[0])
-                l_embeds = torch.prod(l_embeds,dim=0)/torch.sqrt(l_row)
-                l_embeds.to(device)
+                l_embeds = torch.prod(l_embeds,dim=0).reshape(1,-1)/torch.sqrt(l_row)
                
-                print(type(s_embeds), type(l_embeds))
-                transformer_input = torch.cat((s_embeds, l_embeds), dim=1)
-                
-                print(transformer_input.shape)
+                line_input = torch.cat((s_embeds, l_embeds), 0).reshape(1,-1).to(device)
+                transformer_input[idx] = line_input
+
+        print(transformer_input.shape)
+        cnn_model.forward(transformer_input).to(device)
+           
+            
 
 def main():
     """
