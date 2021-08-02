@@ -56,7 +56,7 @@ def make_batch(sent, labels, device):
 def train_sent_label_embeds(train_data, sent_len, epochs):
     
     word_to_idx, idx_to_word, label_to_idx, idx_to_label = get_vocab()    
-    device = torch.device('cuda:0' if torch.cuda.is_available else 'cpu')
+    device = torch.device('cuda:7' if torch.cuda.is_available else 'cpu')
    
     input_sent_pad, target_sent_pad, input_label_pad, output_label_pad = 0, 0, 0, 0
     loss_func = nn.CrossEntropyLoss()

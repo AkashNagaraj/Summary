@@ -219,8 +219,9 @@ class Transformer(nn.Module):
         out = self.decoder(trg, enc_src, src_mask, trg_mask)
         return out
 
+"""
 if __name__ == "__main__":
-    device = torch.device("cuda:0" if torch.cuda.is_available else "cpu") 
+    device = torch.device("cuda:7" if torch.cuda.is_available else "cpu") 
     #device = torch.device("cpu")
     input_sent = 10
     output_sent = 10
@@ -239,6 +240,4 @@ if __name__ == "__main__":
     out = soft(out)
     out = torch.argmax(out,dim=2)
     print(out.shape)#torch.argmax(out[1], dim=1))
-
-
-
+"""
