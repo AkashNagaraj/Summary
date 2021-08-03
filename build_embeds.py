@@ -53,10 +53,10 @@ def make_batch(sent, labels, device):
     return input_sent.reshape(-1,sent_batch), output_sent.reshape(-1,sent_batch), input_labels.reshape(-1,label_batch), output_labels.reshape(-1,label_batch)   
 
 
-def train_sent_label_embeds(train_data, sent_len, epochs):
+def train_sent_label_embeds(train_data, sent_len, epochs, cuda_num):
     
     word_to_idx, idx_to_word, label_to_idx, idx_to_label = get_vocab()    
-    device = torch.device('cuda:7' if torch.cuda.is_available else 'cpu')
+    device = torch.device('cuda:' + cuda_num if torch.cuda.is_available else 'cpu')
    
     input_sent_pad, target_sent_pad, input_label_pad, output_label_pad = 0, 0, 0, 0
     loss_func = nn.CrossEntropyLoss()

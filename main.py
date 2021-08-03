@@ -24,9 +24,10 @@ def make_vector(data):
     line_sent, line_label = [], []
     for sent_, label_ in data:
         sent, label = convert_to_vec(sent_, label_)
-        print("Sent val: {}".format(len(sent)))
-        line_sent.append(sent)
-        line_label.append(label)
+        if len(sent)>0:
+            #print("Sent val: {}".format(len(sent)))
+            line_sent.append(sent)
+            line_label.append(label)
     return line_sent, line_label
 
 
@@ -60,14 +61,11 @@ def transformer_data(data):
         yield (line_sent, line_label), section_abstract
 
 
-def combine_embeds(device, type_):
+def combine_embeds(cuda_num, type_):
     
-
     data_dir, weights_dir = 'data/pubmed-dataset/', 'data/models/'
     word_to_idx, idx_to_word, label_to_idx, idx_to_label = get_vocab()
-
-    device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
-
+    device = torch.device('cuda:'+cuda_num if torch.cuda.is_available() else 'cpu')
     input_pad, output_pad = 0, 0
     loss_func = nn.CrossEntropyLoss()
     
@@ -84,7 +82,6 @@ def combine_embeds(device, type_):
     input_embed_len = label_embeddings.shape[1] + sent_embeddings.shape[1] 
     current_file = type_+'.txt'
     read_lines = open(data_dir+current_file,'r').readlines()
-    
     #print(label_embeddings.shape, sent_embeddings.shape)
 
     for index, (input_, output) in enumerate(transformer_data(read_lines)):
@@ -92,52 +89,40 @@ def combine_embeds(device, type_):
         count, sent, label = 0, input_[0], input_[1]
         transformer_input = torch.empty(size=(len(sent), input_embed_len)).to(device)
         
-        print("Training abstract input : {}".format(index))
         for idx, val in enumerate(sent):
-            if len(val)!=0:
-                count+=1
-                s = torch.tensor(val, dtype = torch.long).to(device)
-                l = torch.tensor(label[idx], dtype = torch.long).to(device)
+            count+=1
+            s = torch.tensor(val, dtype = torch.long).to(device)
+            l = torch.tensor(label[idx], dtype = torch.long).to(device)
            
-                # Combine word embeds for sentence
-                s_embeds = sent_embeddings[s]
-                s_row = torch.tensor(s_embeds.shape[0])
-                s_embeds = torch.prod(s_embeds,dim=0).reshape(1,-1)/torch.sqrt(s_row)
+            # Combine word embeds for sentence
+            s_embeds = sent_embeddings[s]
+            s_row = torch.tensor(s_embeds.shape[0])
+            s_embeds = torch.prod(s_embeds,dim=0).reshape(1,-1)/torch.sqrt(s_row)
     
-                # Combine words embeds for labels
-                l_embeds = label_embeddings[l]
-                l_row = torch.tensor(l_embeds.shape[0])
-                l_embeds = torch.prod(l_embeds,dim=0).reshape(1,-1)/torch.sqrt(l_row)
+            # Combine words embeds for labels
+            l_embeds = label_embeddings[l]
+            l_row = torch.tensor(l_embeds.shape[0])
+            l_embeds = torch.prod(l_embeds,dim=0).reshape(1,-1)/torch.sqrt(l_row)
                
-                line_input = torch.cat((s_embeds, l_embeds), 0).reshape(1,-1).to(device)
-                transformer_input[idx] = line_input
+            line_input = torch.cat((s_embeds, l_embeds), 0).reshape(1,-1).to(device)
+            transformer_input[idx] = line_input        
         
-        if count>1:
-           transformer_input = torch.unsqueeze(transformer_input,0).unsqueeze(0)
-           cnn_model.forward(transformer_input).to(device)
-           
+        transformer_input = torch.unsqueeze(transformer_input,0).unsqueeze(0)
+        cnn_model.forward(transformer_input)
+
 
 def main():
-    """
-        A = torch.ones([5200, 500]) 
-        B = torch.ones([5200],dtype=torch.long)
-        print(loss(A,B))
-    """
+    
     parser = argparse.ArgumentParser()
-    parser.add_argument("-cuda", "--use_cuda", help="Enter a number")
+    parser.add_argument("-cuda", "--cuda", help="Enter a number")
     args = parser.parse_args()
-
-    if args.use_cuda:
-        device = torch.device("cuda:"+args.use_cuda)
-    else:
-        device = torch.device("cpu")
 
     # == Get word embeddings for sentences and labels === #
     sent_len, epochs = 30, 10
     train_data, test_data, val_data = read_data(sent_len, test_runtime=True)
-    train_sent_label_embeds(train_data, sent_len, epochs)
+    train_sent_label_embeds(train_data, sent_len, epochs, args.cuda)
     
-    combine_embeds(device, type_='train')
+    combine_embeds(args.cuda, type_='train')
     #bleu_check()
     
     
