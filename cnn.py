@@ -2,13 +2,16 @@ import torch
 import torch.nn as nn
 
 class CNN(nn.Module):
-    def __init__(self):
+    def __init__(self, num_classes):
         super(CNN, self).__init__()
+        self.num_classes = num_classes
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout2d(0.2)
-        self.fc = nn.Linear(256, 128)
+        self.fc1 = nn.Linear(num_classes, num_classes*2)
+        self.fc2 = nn.Linear(num_classes*2, num_classes*4)
+        self.fc3 = nn.Linear(num_classes*4, num_classes*2)
 
-        self.cnn1 = nn.Conv2d(in_channels = 1, out_channels = 3, kernel_size = 3, stride = 1, padding = 0)
+        self.cnn1 = nn.Conv2d(in_channels = 1, out_channels = 3, kernel_size = 3, stride = 1, padding = 1)
         self.batch_norm1 = nn.BatchNorm2d(3)
         self.maxpool1 = nn.MaxPool2d(kernel_size=2)
         
@@ -31,6 +34,9 @@ class CNN(nn.Module):
         out = self.batch_norm3(out)
         out = self.cnn4(out)
         out = self.batch_norm4(out)
-        print(out.shape)
+        out = out.reshape(-1, self.num_classes)
+        out = self.fc1(out)
+        out = self.fc2(out)
+        out = self.fc3(out)
+        return out 
 
-        

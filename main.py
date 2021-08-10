@@ -64,31 +64,30 @@ def transformer_data(data):
 def combine_embeds(cuda_num, type_):
     
     data_dir, weights_dir = 'data/pubmed-dataset/', 'data/models/'
-    word_to_idx, idx_to_word, label_to_idx, idx_to_label = get_vocab()
-    device = torch.device('cuda:'+cuda_num if torch.cuda.is_available() else 'cpu')
-    input_pad, output_pad = 0, 0
-    loss_func = nn.CrossEntropyLoss()
-    
-    cnn_model = CNN().to(device)
 
-    sent_model = Transformer(len(word_to_idx), len(word_to_idx), input_pad, output_pad, device).to(device)
     sent_weights = torch.load(weights_dir + 'sentence_model.pth')
     sent_embeddings = sent_weights['encoder.word_embedding.weight']
-    
-    label_model = Transformer(len(label_to_idx), len(label_to_idx), input_pad, output_pad, device).to(device)
     label_weights = torch.load(weights_dir+'label_model.pth')
     label_embeddings = label_weights['encoder.word_embedding.weight']
     
     input_embed_len = label_embeddings.shape[1] + sent_embeddings.shape[1] 
+    
+    word_to_idx, idx_to_word, label_to_idx, idx_to_label = get_vocab()
+    device = torch.device('cuda:'+cuda_num if torch.cuda.is_available() else 'cpu')
+    input_pad, output_pad = 0, 0
+    cnn_model = CNN(input_embed_len).to(device)
+    abstract_model = Transformer(len(word_to_idx) + len(label_to_idx), len(word_to_idx) + len(label_to_idx), input_pad, output_pad, device).to(device)
+    loss_func = nn.CrossEntropyLoss()
+
     current_file = type_+'.txt'
     read_lines = open(data_dir+current_file,'r').readlines()
-    #print(label_embeddings.shape, sent_embeddings.shape)
 
     for index, (input_, output) in enumerate(transformer_data(read_lines)):
 
         count, sent, label = 0, input_[0], input_[1]
         transformer_input = torch.empty(size=(len(sent), input_embed_len)).to(device)
-        
+        abstract_model.zero_grad()
+
         for idx, val in enumerate(sent):
             count+=1
             s = torch.tensor(val, dtype = torch.long).to(device)
@@ -108,7 +107,12 @@ def combine_embeds(cuda_num, type_):
             transformer_input[idx] = line_input        
         
         transformer_input = torch.unsqueeze(transformer_input,0).unsqueeze(0)
-        cnn_model.forward(transformer_input)
+        transformer_input = torch.tensor(cnn_model.forward(transformer_input), dtype=torch.long).reshape(1,-1).to(device)
+
+        transformer_output = torch.tensor([output], dtype = torch.long).to(device)
+
+        print("Input shape:{}, input type :{}, output shape:{}, output type:{}".format(transformer_input.shape, type(transformer_input), transformer_output.shape, type(transformer_output)))
+        #value = abstract_model(transformer_input, transformer_output).to(device)
 
 
 def main():
