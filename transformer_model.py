@@ -170,7 +170,7 @@ class Transformer(nn.Module):
                 forward_expansion=4, 
                 heads=8, 
                 dropout=0, 
-                max_length=100):
+                max_length=140000):
         
         super(Transformer, self).__init__()
         
@@ -219,19 +219,19 @@ class Transformer(nn.Module):
         out = self.decoder(trg, enc_src, src_mask, trg_mask)
         return out
 
+"""
 if __name__ == "__main__":
     #device = torch.device("cuda:7" if torch.cuda.is_available else "cpu") 
-    """
     device = torch.device("cpu")
-    input_sent = 1000
-    output_sent = 999
-    x = torch.ones(1, input_sent, dtype=torch.long).to(device) #138240
+    input_sent = 101
+    output_sent = 9
+    x = torch.zeros(1, input_sent, dtype=torch.long).to(device) #138240
     trg = torch.ones(1, output_sent, dtype=torch.long).to(device) #219
 
     src_pad_idx = 0
     trg_pad_idx = 0
-    src_vocab_size = 1000
-    trg_vocab_size = 1000
+    src_vocab_size = 2
+    trg_vocab_size = 2
     
     model = Transformer(src_vocab_size, trg_vocab_size, src_pad_idx, trg_pad_idx, device).to(device)
     
@@ -240,4 +240,4 @@ if __name__ == "__main__":
     out = soft(out)
     out = torch.argmax(out,dim=2)
     print(out.shape)#torch.argmax(out[1], dim=1))
-    """
+"""

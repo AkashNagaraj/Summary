@@ -111,8 +111,9 @@ def combine_embeds(cuda_num, type_):
 
         transformer_output = torch.tensor([output], dtype = torch.long).to(device)
 
-        print("Input shape:{}, input type :{}, output shape:{}, output type:{}".format(transformer_input.shape, type(transformer_input), transformer_output.shape, type(transformer_output)))
-        #value = abstract_model(transformer_input, transformer_output).to(device)
+        #print("Input shape:{}, input type :{}, output shape:{}, output type:{}".format(transformer_input.shape, type(transformer_input), transformer_output.shape, type(transformer_output)))
+        value = abstract_model(transformer_input, transformer_output).to(device)
+        print(value.shape)
 
 
 def main():
