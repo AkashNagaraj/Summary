@@ -96,7 +96,8 @@ def combine_embeds(cuda_num, type_):
             # Combine word embeds for sentence
             s_embeds = sent_embeddings[s]
             s_row = torch.tensor(s_embeds.shape[0])
-            s_embeds = torch.prod(s_embeds,dim=0).reshape(1,-1)/torch.sqrt(s_row)
+            s_embeds = torch.prod(s_embeds,dim=0).to(device)
+            s_embeds = s_embeds/torch.sqrt(s_row).to(device)
     
             # Combine words embeds for labels
             l_embeds = label_embeddings[l]
