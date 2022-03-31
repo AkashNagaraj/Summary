@@ -1,10 +1,17 @@
+import ast, math, time, sys
+
+import numpy as np
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F 
+from torch.utils.data import Dataset, DataLoader, IterableDataset
 
+from itertools import islice
 from preprocess import *
 from transformer_model import *
+
 
 def get_vocab():
     word_dir = "data/pubmed-dataset/vocab"
@@ -16,88 +23,143 @@ def get_vocab():
         word_to_idx[line[0]] = int(len(word_to_idx)+1)
         idx_to_word[word_to_idx[line[0]]] = line[0]
 
-    file2 = [val.split() for val in open(label_dir, 'r').read().splitlines()]
+    file2 = [val.split() for val in open(label_dir, 'r').read().strip().splitlines() if val.split()!=[]]
     label_to_idx, idx_to_label = {}, {} 
     for line in file2:
-        label_to_idx[line[0]] = int(len(label_to_idx)+1)
-        idx_to_label[label_to_idx[line[0]]] = line[0]
-    
+        try:
+            label_to_idx[line[0]] = int(len(label_to_idx)+1)
+            idx_to_label[label_to_idx[line[0]]] = line[0]
+        except:
+            print("Error in line :",line)
+            break;
+
     label_to_idx['unk'] = len(label_to_idx)+1
     idx_to_label[label_to_idx['unk']] = 'unk'
 
     return word_to_idx, idx_to_word, label_to_idx, idx_to_label
 
 
-def make_batch(sent, labels, device):
-    word_to_idx, idx_to_word, label_to_idx, idx_to_label = get_vocab() 
-
-    sent_batch = 50    
-    sent_trim = sent_batch*math.floor(len(sent)/sent_batch)
-    sent = sent[:sent_trim]
-    sent = [word_to_idx[word] if word in word_to_idx else word_to_idx['unk'] for word in sent]
-    input_sent = torch.tensor([sent[:-sent_batch]], dtype=torch.long).to(device)
-    output_sent = torch.tensor([sent[sent_batch:]], dtype=torch.long).to(device)
-    #sent_batch = [[sent[idx:idx+sent_batch]] for idx in range(0, len(sent), sent_batch)]
+def make_tensor(data, type_, device, percent):
     
-    label_batch = 10
-    label_trim = label_batch*math.floor(len(labels)/label_batch)
-    labels = labels[:label_trim]
-    try:
-        labels = [label_to_idx[re.sub(r'[^\w\s]','',word.lower())] if re.search(r'\d+',word)==None else label_to_idx['number'] for word in labels]
-        input_labels = torch.tensor([labels[:-label_batch]], dtype=torch.long).to(device)
-        output_labels = torch.tensor([labels[label_batch:]], dtype=torch.long).to(device)
-        #label_batch = [[labels[idx:idx+label_batch]] for idx in range(0, len(labels), label_batch)]    
-    except:
-        print(labels)
+    if type_ =='sent':
+        word_to_idx, idx_to_word, _, _ = get_vocab() 
+    else:
+        _, _, word_to_idx, idx_to_word = get_vocab()
 
-    return input_sent.reshape(-1,sent_batch), output_sent.reshape(-1,sent_batch), input_labels.reshape(-1,label_batch), output_labels.reshape(-1,label_batch)   
+    length = len(data)
+    size = math.floor((length*percent)*100)
+    new_data = [word_to_idx[word] if word in word_to_idx else word_to_idx['unk'] for word in data]
+    
+    # Normalize the word data
+    word_data = [val for val in idx_to_word.keys()]
+    avg = sum(word_data)/len(word_data)
+    var = np.var(word_data)
+    new_data = [(val-avg)/var for val in new_data]
+
+    new_tensor = torch.tensor([new_data[:size]], dtype=torch.long).to(device)
+
+    return new_tensor.reshape(-1,length)   
 
 
-def train_sent_label_embeds(train_data, sent_len, epochs, cuda_num):
+def combine_list(list_data):
+    check = list_data[0]
+    new_list = [check]
+    for val in list_data:
+        if val!=check:
+            new_list.append(val)
+            check=val
+    new_list = [word for sub in new_list for word in sub]
+    return new_list
+
+
+def convert_data(data):
+    
+    new_label, new_sentence = [], []
+    for line in data[0]: # 0 has the encoder value
+        label, sent = [], []
+
+        for section in line[0]:
+            if section[0]!=[] and section[1]!=[]:
+                label.append(section[1])
+                sent.append(section[0])
+        
+        if label!=[] and sent!=[]:
+            new_label.append(combine_list(label))
+            new_sentence.append(combine_list(sent))
+        
+    return new_label, new_sentence
+
+
+def train_sent(sentence_data, cuda_num, epochs):
     
     word_to_idx, idx_to_word, label_to_idx, idx_to_label = get_vocab()    
     device = torch.device('cuda:' + cuda_num if torch.cuda.is_available else 'cpu')
    
     input_sent_pad, target_sent_pad, input_label_pad, output_label_pad = 0, 0, 0, 0
+    
     loss_func = nn.CrossEntropyLoss()
-
     sentence_model = Transformer(len(word_to_idx), len(word_to_idx), input_sent_pad, target_sent_pad, device).to(device)
     sent_optimizer = optim.SGD(sentence_model.parameters(), lr=0.01)
-    label_model = Transformer(len(label_to_idx), len(label_to_idx), input_label_pad, output_label_pad, device).to(device)
-    label_optimizer = optim.SGD(label_model.parameters(), lr=0.01)
  
     # ==== Pretraining the sent and label embeddings === # 
     losses = []
-    for epoch in range(epochs):
-      total_loss = 0
-      for idx, line in enumerate(train_data):  
-        sentence_model.zero_grad()
-        label_model.zero_grad()
 
-        encoder = line[0]
-        decoder = line[1]
-        sentences = [words for sent, label in encoder for words in sent]
-        labels = [words for sent, label in encoder for words in label]
-        s_inp, s_out, l_inp, l_out = make_batch(sentences, labels, device)
+    for epoch in range(epochs):
+        total_loss = 0
+        start = time.time()    
         
-        s_transformer = sentence_model(s_inp, s_out).to(device)
-        s_transformer = s_transformer.reshape(-1,len(word_to_idx))
-        s_loss = loss_func(s_transformer, s_out.reshape(-1))
-    
-        l_transformer = label_model(l_inp, l_out).to(device)
-        l_transformer = l_transformer.reshape(-1,len(label_to_idx))
-        l_loss = loss_func(l_transformer, l_out.reshape(-1))     
-      
-        current_loss = s_loss + l_loss
+        for idx, sent in enumerate(sentence_data):
+            sentence_model.zero_grad()
+            
+            s_inp = make_tensor(sent[:int(len(sent)/2)], 'sent', device, 100) # Use 30%
+            s_out = make_tensor(sent[int(len(sent)/2):], 'sent', device, 100) # Use 30%
+            
+            try:
+                s_transformer = sentence_model(s_inp, s_out).to(device)
+                s_transformer = s_transformer.reshape(-1,len(word_to_idx))
+                s_loss = loss_func(s_transformer, s_out.reshape(-1))
+            except:
+                print(" Large Size Input : {}, Large Size Output : {}".format(s_inp.size(), s_out.size()))
+                sys.exit()
+
+            current_loss = s_loss 
+            current_loss.backward()
+            sent_optimizer.step()
+            torch.cuda.empty_cache()
+            total_loss += current_loss.item()
         
-        current_loss.backward()
-        sent_optimizer.step()
-        label_optimizer.step()
-        
-        total_loss += current_loss.item()
-      losses.append(total_loss)
-    print(losses)
+        losses.append(total_loss)
+        end = time.time()
 
     torch.save(sentence_model.state_dict(), 'data/models/'+'sentence_model.pth')
-    torch.save(label_model.state_dict(),'data/models/'+'label_model.pth')
+
+def train_labels(data):
+    label_dict = {}
+    for val in open("data/glove.6B.50d.txt").readlines():
+        val = val[:-1]
+        word = val.split()[0]
+        emb = val.split()[1:]
+        label_dict[word] = list(map(float, emb))
+    
+    complete_tensors = []
+    for idx, line in enumerate(data): # Slice to build only fixed number of label embeddings
+        if idx==1:
+            print(len([[label_dict[word]] if word in label_dict.keys() else [label_dict['unknown']] for word in line]))
+        line_tensor = torch.tensor([[label_dict[word]] if word in label_dict.keys() else [label_dict['unknown']] for word in line], dtype=torch.long)
+        label_tensor = torch.sum(line_tensor, dim=0)/len(line)
+        complete_tensors.append(label_tensor)
+    torch.save({"label_weights":complete_tensors}, 'data/models/'+'label_model.pth')        
+        
+
+# Pretraining to get some embeddings for the sentence and labels seperately
+def train_sent_label_embeds(training_data, sent_len, epochs, cuda_num):
+    
+    BATCH_SIZE = 10
+    training_data = training_data[:(len(training_data)//BATCH_SIZE)*BATCH_SIZE]
+    label_data, sentence_data = convert_data(training_data)
+    
+    train_sent(sentence_data, cuda_num, epochs)    
+    train_labels(label_data)    
+
+    #print("Data from build embeddings : ", len(training_data))
 

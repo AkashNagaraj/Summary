@@ -20,6 +20,7 @@ class SelfAttention(nn.Module):
         value_len, key_len, query_len = values.shape[1], keys.shape[1], query.shape[1]
 
         # Split embedding into self.head pieces
+        # print("Shape of values : {}, value_len : {}, shape of keys : {}, key_len : {}".format(values.shape, value_len, keys.shape, key_len))
         values = values.reshape(N, value_len, self.heads, self.head_dim)
         keys = keys.reshape(N, key_len, self.heads, self.head_dim)
         queries = query.reshape(N, query_len, self.heads, self.head_dim)
@@ -221,17 +222,17 @@ class Transformer(nn.Module):
 
 """
 if __name__ == "__main__":
-    #device = torch.device("cuda:7" if torch.cuda.is_available else "cpu") 
-    device = torch.device("cpu")
-    input_sent = 101
-    output_sent = 9
-    x = torch.zeros(1, input_sent, dtype=torch.long).to(device) #138240
+    device = torch.device("cuda:4" if torch.cuda.is_available else "cpu")
+    #device = torch.device("cpu")
+    input_sent = 306
+    output_sent = 219
+    x = torch.zeros(1, 15*input_sent, dtype=torch.long).to(device) #138240
     trg = torch.ones(1, output_sent, dtype=torch.long).to(device) #219
 
     src_pad_idx = 0
     trg_pad_idx = 0
-    src_vocab_size = 2
-    trg_vocab_size = 2
+    src_vocab_size = 512
+    trg_vocab_size = 512
     
     model = Transformer(src_vocab_size, trg_vocab_size, src_pad_idx, trg_pad_idx, device).to(device)
     
