@@ -1,4 +1,5 @@
 import torch
+import sys
 import torch.nn as nn
 
 class SelfAttention(nn.Module):
@@ -99,6 +100,15 @@ class Encoder(nn.Module):
     def forward(self, x, mask):
             N, seq_length = x.shape
             positions = torch.arange(0, seq_length).expand(N,seq_length).to(self.device)
+            
+            ## Fixing error
+            torch.set_printoptions(profile="full")
+            file_ = open('temp.txt','w+')
+            #file_.write(str(positions))
+            file_.write(str(x)) 
+            ## self.word_embedding(x))
+
+            
             out = self.dropout(self.word_embedding(x) + self.position_embedding(positions))
             #print("Encoder - positions: {}, out: {}".format(positions.shape, out.shape))
             for layer in self.layers:
@@ -220,13 +230,13 @@ class Transformer(nn.Module):
         out = self.decoder(trg, enc_src, src_mask, trg_mask)
         return out
 
-"""
+
 if __name__ == "__main__":
     device = torch.device("cuda:4" if torch.cuda.is_available else "cpu")
     #device = torch.device("cpu")
-    input_sent = 306
+    input_sent = 4590
     output_sent = 219
-    x = torch.zeros(1, 15*input_sent, dtype=torch.long).to(device) #138240
+    x = torch.zeros(1, input_sent, dtype=torch.long).to(device) #138240
     trg = torch.ones(1, output_sent, dtype=torch.long).to(device) #219
 
     src_pad_idx = 0
@@ -241,4 +251,4 @@ if __name__ == "__main__":
     out = soft(out)
     out = torch.argmax(out,dim=2)
     print(out.shape)#torch.argmax(out[1], dim=1))
-"""
+

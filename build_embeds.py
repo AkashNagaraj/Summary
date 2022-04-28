@@ -118,20 +118,24 @@ def train_sent(sentence_data, cuda_num, epochs):
                 s_transformer = sentence_model(s_inp, s_out).to(device)
                 s_transformer = s_transformer.reshape(-1,len(word_to_idx))
                 s_loss = loss_func(s_transformer, s_out.reshape(-1))
+                
+                ## Checking shape to see how much GPU can handle
+                print("Shape of s_tranformer : {}, s_out : {}".format(s_transformer.shape, s_out.shape))
             except:
                 print(" Large Size Input : {}, Large Size Output : {}".format(s_inp.size(), s_out.size()))
                 sys.exit()
-
+            
+            torch.cuda.empty_cache()
             current_loss = s_loss 
             current_loss.backward()
             sent_optimizer.step()
-            torch.cuda.empty_cache()
             total_loss += current_loss.item()
-        
+         
         losses.append(total_loss)
         end = time.time()
-
-    torch.save(sentence_model.state_dict(), 'data/models/'+'sentence_model.pth')
+        print("Time taken : {}".format((end-start),'.3f'))
+    #torch.save(sentence_model.state_dict(), 'data/models/'+'sentence_model.pth')
+    sys.exit()
 
 def train_labels(data):
     label_dict = {}

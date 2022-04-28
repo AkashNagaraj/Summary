@@ -46,15 +46,14 @@ def sample_transformer(data_dir, current_file):
     current_file = 'final_'+type_+'.txt'
 
 
-
 def transformer_data(current_file):
-   
+    
     #current_file = type_ + '.txt'
     data = open(current_file,'r').readlines()
     word_to_idx, _, _, _ = get_vocab()
     file_data = [json.loads(val) for val in data]
 
-    for idx, line in enumerate(file_data): # check
+    for idx, line in enumerate(file_data[:2]): ##### !! Use the full data while training 
         
         section_data = line['sections']
         section_labels = line['section_names']
@@ -78,73 +77,83 @@ def combine_embeds(cuda_num, type_):
     label_embeddings = label_weights['label_weights']
     
     input_embed_len = len(label_embeddings) + sent_embeddings.shape[1] 
-    print("Input embed len:",input_embed_len)
 
     word_to_idx, idx_to_word, label_to_idx, idx_to_label = get_vocab()
-    device = torch.device('cuda:'+cuda_num if torch.cuda.is_available() else 'cpu')
+    #device = torch.device('cpu')
+    device = torch.device("cuda:"+cuda_num if torch.cuda.is_available() else 'cpu')
     input_pad, output_pad = 0, 0
+    
     cnn_model = CNN(input_embed_len).to(device)
 
     # Transfomer with input and ouput size of len(sentence) + len(labels)
-    abstract_model = Transformer(len(word_to_idx) + len(label_to_idx), len(word_to_idx) + len(label_to_idx), input_pad, output_pad, device).to(device)
+    abstract_model = Transformer(42584, 42584, input_pad, output_pad, device).to(device) #len(word_to_idx) + len(label_to_idx)
     abstract_optimizer = optim.SGD(abstract_model.parameters(), lr=0.01)
     loss_func = nn.CrossEntropyLoss()
 
     current_file = data_dir + type_ + '.txt'
     sent_count = 0
     total_loss = []
-
+    
+    abstract_data = {'transformer_output':[], "abstract_prediction":[]}
     for index, (encoder_data, output) in enumerate(transformer_data(current_file)):
         
-        count, section, label = 0, encoder_data[0], encoder_data[1]
-        t_input = torch.empty(size=(len(section), 306)).to(device)
+        sent_count, section, label = 0, encoder_data[0], encoder_data[1]
+        t_input = torch.tensor(()).to(device) #empty(size=(len(section), 306)).to(device)
         abstract_model.zero_grad()
-        print(len(label))
+            
         # Concat sentence and label embeddings
         for idx, sent in enumerate(section):
-            count+=1
+            
             s = torch.tensor(sent, dtype = torch.long).to(device)
             
             # Combine word embeds for sentence
             s_embeds = sent_embeddings[s]
             s_row = torch.tensor(s_embeds.shape[0])
             s_embeds = torch.sum(s_embeds,dim=0).to(device)
-            s_embeds = s_embeds/torch.sqrt(s_row).to(device)
-            torch.cuda.empty_cache()
+            s_embeds = s_embeds/torch.sqrt(s_row)
+            s_embeds.to(device)
 
             # Combine words embeds for labels
             l_embeds = label_embeddings[sent_count]
-            l_embeds = torch.tensor(l_embeds,dtype=torch.long).to(device)
+            l_embeds = torch.tensor(l_embeds,dtype=torch.long)
             sent_count +=  1
 
-            #print("Size - s_embeds:{}, l_embeds:{}".format(s_embeds.shape, l_embeds.shape))
-            
-            # Concatenate label and sent embeds
-            line_input = torch.cat((s_embeds.reshape(1,-1), l_embeds), 1).reshape(1,-1)
-            t_input[idx] = torch.tensor(line_input, dtype=torch.long)       
+            line_input = torch.cat((s_embeds.reshape(1,-1), l_embeds), 1).reshape(1,-1).to(device)
+            t_input = torch.cat((t_input.squeeze(), line_input.squeeze()), 0)               
         
-        t_output = torch.tensor([output], dtype = torch.long) #.to(device)
-        
-        print("Shape -> t_input:{},{}, t_output:{},{}".format(t_input.shape, t_input.type(), t_output.shape, t_output.type()))
-        
-        abstract_prediction = abstract_model(t_input, t_output).to(device)
-        loss = loss_func(abstract_prediction, t_output.reshape(-1))
-        loss.backward()
-        abstract_optimizer.step()
         torch.cuda.empty_cache()
-        total_loss.append(loss.item())
         
-        print("Abstract loss : ",total_loss)
+        activation = nn.ReLU()
+        t_input = activation(torch.unsqueeze(t_input, 0).long()).to(device)
+        t_output = activation(torch.tensor([output], dtype = torch.long)).to(device)
+        
+        print(t_input.shape, t_input.type, t_output.shape, t_output._type)
         sys.exit()
-
-
+        #abstract_prediction = abstract_model(t_input, t_output)#reshape(219,-1)
+        """
+        t_output = t_output.squeeze(0)
+        abstract_data['transformer_output'].append(t_output) 
+        abstract_data['abstract_prediction'].append(abstract_prediction) 
+        
+        torch.save(abstract_prediction, 'data/models/'+'sentence_model.pth')
+        print("Completed passing to transformer. Shape of prediction : {}, t_output : {}".format(abstract_prediction.shape, t_output.shape))
+         
+        loss = loss_func(abstract_prediction, t_output)
+        current_loss = loss 
+        current_loss.backward()
+        sys.exit()
+        abstract_optimizer.step()
+        total_loss.append(loss.item())
+        print("Abstract loss : ",total_loss)
+        """
+    
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-cuda", "--cuda", help="Enter a number")
     args = parser.parse_args()
-
-    """    
+    
+    """
     # == Get word embeddings for sentences and labels === #
     sent_len, epochs, test_size = 30, 30, 50
     complete_data = read_data(sent_len, test_size, test_runtime=False) 
