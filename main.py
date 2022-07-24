@@ -115,21 +115,22 @@ def combine_embeds(cuda_num, type_):
 
             # Combine words embeds for labels
             l_embeds = label_embeddings[sent_count]
-            l_embeds = torch.tensor(l_embeds,dtype=torch.long)
+            l_embeds = torch.tensor(l_embeds,dtype=torch.long).to(device)
             sent_count +=  1
 
             line_input = torch.cat((s_embeds.reshape(1,-1), l_embeds), 1).reshape(1,-1).to(device)
             t_input = torch.cat((t_input.squeeze(), line_input.squeeze()), 0)               
         
-        torch.cuda.empty_cache()
+        #torch.cuda.empty_cache()
         
         activation = nn.ReLU()
         t_input = activation(torch.unsqueeze(t_input, 0).long()).to(device)
         t_output = activation(torch.tensor([output], dtype = torch.long)).to(device)
         
-        print(t_input.shape, t_input.type, t_output.shape, t_output._type)
-        sys.exit()
-        #abstract_prediction = abstract_model(t_input, t_output)#reshape(219,-1)
+        print(index, t_input.shape, t_output.shape)
+        #sys.exit()
+
+        abstract_prediction = abstract_model(t_input, t_output).reshape(219,-1)
         """
         t_output = t_output.squeeze(0)
         abstract_data['transformer_output'].append(t_output) 
@@ -153,16 +154,17 @@ def main():
     parser.add_argument("-cuda", "--cuda", help="Enter a number")
     args = parser.parse_args()
     
-    """
-    # == Get word embeddings for sentences and labels === #
+    
+    # == Get embeddings for sentences and labels === #
     sent_len, epochs, test_size = 30, 30, 50
     complete_data = read_data(sent_len, test_size, test_runtime=False) 
-    train_data = complete_data['train']
-    train_sent_label_embeds(train_data, sent_len, epochs, args.cuda)
-    """
+    #train_data = complete_data['train']
+    
+    test_data = complete_dataa['test']
+    train_sent_label_embeds(test_data, sent_len, epochs, args.cuda)
 
     # == Combine them and build input for transformer == #
-    combine_embeds(args.cuda, type_='train')
+    # combine_embeds(args.cuda, type_='train')
     
     
 if __name__ == "__main__":

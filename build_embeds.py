@@ -39,6 +39,7 @@ def get_vocab():
     return word_to_idx, idx_to_word, label_to_idx, idx_to_label
 
 
+# Convert the words to tensors using the word_to_idx dictionary
 def make_tensor(data, type_, device, percent):
     
     if type_ =='sent':
@@ -50,12 +51,11 @@ def make_tensor(data, type_, device, percent):
     size = math.floor((length*percent)*100)
     new_data = [word_to_idx[word] if word in word_to_idx else word_to_idx['unk'] for word in data]
     
-    # Normalize the word data
+    # Normalize the data after converting to int. This step could be improved
     word_data = [val for val in idx_to_word.keys()]
     avg = sum(word_data)/len(word_data)
     var = np.var(word_data)
     new_data = [(val-avg)/var for val in new_data]
-
     new_tensor = torch.tensor([new_data[:size]], dtype=torch.long).to(device)
 
     return new_tensor.reshape(-1,length)   
@@ -90,6 +90,7 @@ def convert_data(data):
     return new_label, new_sentence
 
 
+# Using first half of the sentence to predict second half with transformers. These initial embeddings would be stored as pretraining weights. Currently it is not being done batch wise but single sentences are being passed.
 def train_sent(sentence_data, cuda_num, epochs):
     
     word_to_idx, idx_to_word, label_to_idx, idx_to_label = get_vocab()    
@@ -101,7 +102,6 @@ def train_sent(sentence_data, cuda_num, epochs):
     sentence_model = Transformer(len(word_to_idx), len(word_to_idx), input_sent_pad, target_sent_pad, device).to(device)
     sent_optimizer = optim.SGD(sentence_model.parameters(), lr=0.01)
  
-    # ==== Pretraining the sent and label embeddings === # 
     losses = []
 
     for epoch in range(epochs):
@@ -134,8 +134,8 @@ def train_sent(sentence_data, cuda_num, epochs):
         losses.append(total_loss)
         end = time.time()
         print("Time taken : {}".format((end-start),'.3f'))
-    #torch.save(sentence_model.state_dict(), 'data/models/'+'sentence_model.pth')
-    sys.exit()
+    torch.save(sentence_model.state_dict(), 'data/models/'+'sentence_model.pth')
+
 
 def train_labels(data):
     label_dict = {}
@@ -153,9 +153,9 @@ def train_labels(data):
         label_tensor = torch.sum(line_tensor, dim=0)/len(line)
         complete_tensors.append(label_tensor)
     torch.save({"label_weights":complete_tensors}, 'data/models/'+'label_model.pth')        
-        
+ 
 
-# Pretraining to get some embeddings for the sentence and labels seperately
+# Performing pretraining to get some embeddings for the sentences. Using Glove for the labels
 def train_sent_label_embeds(training_data, sent_len, epochs, cuda_num):
     
     BATCH_SIZE = 10
@@ -164,6 +164,4 @@ def train_sent_label_embeds(training_data, sent_len, epochs, cuda_num):
     
     train_sent(sentence_data, cuda_num, epochs)    
     train_labels(label_data)    
-
-    #print("Data from build embeddings : ", len(training_data))
 

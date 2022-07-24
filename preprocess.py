@@ -24,8 +24,7 @@ def preprocess_data(sentence, max_len):
 
 # Adding labels with each of the section sentences
 def make_input(data, labels, max_len):
-    #print("Label from make_input:",labels)
-    input_data, min_len= [], 6
+    input_data, min_len = [], 6
     for idx, list_ in enumerate(data):
         labels[idx] = preprocess_labels(labels[idx])
         for sent in list_:
@@ -37,6 +36,7 @@ def make_input(data, labels, max_len):
 def build_data(file_data, sent_len, type_):
     
     """
+    Json structure - 
     {
     'article_text':[[S1,S2,..],[S1,S2..],...,[S1,S2..]]
     'abstract_text':[[S1],[S1],...,[S1]]
@@ -50,7 +50,7 @@ def build_data(file_data, sent_len, type_):
     decoder_len = 300
     line_labels = []
 
-    # Goal : sections + section_names - > abstract_text
+    # The goal is to combine the [sections + section_names] data which is used as encoder and the abstract text is the decoder data for the transformer.
     for line in file_data:
         #content = line['article_text']
         section_data = line['sections']
@@ -59,34 +59,22 @@ def build_data(file_data, sent_len, type_):
         encoder_data = make_input(section_data, section_labels, sent_len)         
         decoder_data = ' '.join(line['abstract_text']).split() #same length - preprocess_data(' '.join(line['abstract_text']),decoder_len)
         train_data.append((encoder_data, decoder_data))
-
     
     return train_data
 
-def write_tensor_data(max_sent_len, size, type_, test_runtime):
+
+def write_word_data(max_sent_len, size, type_, test_runtime):
     data_dir = "data/pubmed-dataset/"             
     current = type_+'.txt'             
     read_lines = open(data_dir+current,'r').readlines()
     train_data = [json.loads(val) for val in read_lines]
     train_data = [train_data[i:i+size] for i in range(len(train_data))[::size]]
-
+    
+    # The length of the train_data is the number of sections being used
     if test_runtime:
-        train_data = train_data[:2]
-
+        train_data = train_data[:10]
     final_data = [build_data(val, max_sent_len, type_) for val in train_data]
     
-    """
-    write_data = {}
-    pickle_file = 'final_' + current[:-4] + '.pickle'
-    if not os.path.exists(data_dir + pickle_file):
-        print("Pickle file with data already present")
-        for idx, val in enumerate(final_data):
-            write_data[idx] = val
-
-        file = open(data_dir+pickle_file,'wb')
-        pickle.dump(write_data, file)
-        file.close()
-    """
     return final_data
 
 
@@ -94,6 +82,6 @@ def read_data(max_sent_len, size, test_runtime):
     data = {}
     types = ['train', 'test', 'val']
     for t in types :
-        data[t] = write_tensor_data(max_sent_len, size, t, test_runtime)
+        data[t] = write_word_data(max_sent_len, size, t, test_runtime)
    
     return data
